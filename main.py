@@ -37,6 +37,11 @@ def chat(req: ChatRequest):
     # 3. Gọi Gemini và trả kết quả
     if prompt:
         answer = call_llm(prompt)
+        
+        # NÂNG CẤP: Nếu AI từ chối, làm rỗng danh sách nguồn
+        if "Xin lỗi, mình không tìm thấy" in answer:
+            return ChatResponse(answer=answer, sources=[])
+            
         return ChatResponse(answer=answer, sources=sources)
     else:
         return ChatResponse(

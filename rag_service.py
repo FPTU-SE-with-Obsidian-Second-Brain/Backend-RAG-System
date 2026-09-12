@@ -33,26 +33,38 @@ def detect_subject_code(question: str):
     return match.group(0) if match else None
 
 def retrieve(question: str, top_k: int = 5):
-    """Truy xuất tài liệu từ Vector DB"""
+    """Truy xuất tài liệu từ Vector DB với logic lọc thông minh"""
     query_embedding = embedder.encode(question).tolist()
     code = detect_subject_code(question)
     
-    # Chiến lược 1: Ưu tiên lọc chính xác theo mã môn trước
-    where_filter = {"source_id": code} if code else None
+    # 1. Bắt từ khóa chuyên ngành để nhắm mục tiêu vào file Khung chương trình
+    is_curriculum_query = any(keyword in question.lower() for keyword in ["ngành", "chuyên ngành", "chương trình", "se", "kỹ thuật phần mềm"])
     
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        where=where_filter
-    )
-    
-    # Chiến lược 2: Nếu lọc theo mã môn không ra kết quả, tìm kiếm ngữ nghĩa toàn cục
-    if code and (not results["documents"] or not results["documents"][0]):
+    if code:
+        # Nếu có mã môn -> Ưu tiên tìm chính xác môn đó
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k
+            n_results=top_k,
+            where={"source_id": code}
         )
-        
+        if results["documents"] and results["documents"][0]:
+            return results
+            
+    elif is_curriculum_query:
+        # Nếu là câu hỏi về ngành học -> Bắt buộc tìm trong file Curriculum
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            where={"type": "curriculum"}
+        )
+        if results["documents"] and results["documents"][0]:
+            return results
+
+    # 2. Fallback: Nếu không rơi vào 2 trường hợp trên, tìm kiếm ngữ nghĩa toàn cục
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k
+    )
     return results
 
 def build_prompt(question: str, results: dict):
