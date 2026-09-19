@@ -27,7 +27,7 @@ def parse_frontmatter(raw_text):
     return {}, raw_text
 
 def ingest_all():
-    files = glob.glob(os.path.join(KB_DIR, "*.md"))
+    files = sorted(glob.glob(os.path.join(KB_DIR, "**", "*.md"), recursive=True))
     print(f"Tìm thấy {len(files)} file Markdown. Bắt đầu nạp dữ liệu...")
     
     for path in files:
@@ -36,11 +36,11 @@ def ingest_all():
             
         meta, body = parse_frontmatter(raw)
         chunks = chunk_by_heading(body)
+        rel_path = os.path.relpath(path, KB_DIR).replace("\\", "/")
         
         for i, chunk in enumerate(chunks):
-            # Tạo ID duy nhất cho mỗi chunk để tránh nạp trùng lặp
-            file_name = os.path.basename(path)
-            chunk_id = f"{meta.get('id', file_name)}::{i}"
+            # Dùng đường dẫn tương đối để 114 file (kể cả README trùng tên) không ghi đè nhau
+            chunk_id = f"{rel_path}::{i}"
             
             # Chuyển text thành vector
             embedding = embedder.encode(chunk["text"]).tolist()
@@ -55,7 +55,7 @@ def ingest_all():
                     "type": meta.get("type", "unknown"),
                     "tags": ",".join(meta.get("tags", [])),
                     "section_title": chunk["section_title"],
-                    "source_file": file_name,
+                    "source_file": rel_path,
                 }]
             )
     print(f"✅ Đã nạp thành công {len(files)} file vào Vector Database!")
